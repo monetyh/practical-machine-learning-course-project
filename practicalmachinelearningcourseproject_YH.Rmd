@@ -1,0 +1,121 @@
+---
+title: "practical machine learning course project"
+author: "YH"
+date: "January 5, 2017"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r pressure, echo=TRUE}
+#Background Introduction
+#Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large 
+#amount of data about personal activity relatively inexpensively. These type of devices are part of
+#the quantified self movement - a group of enthusiasts who take measurements about themselves 
+#regularly to improve their health, to find patterns in their behavior, or because they are tech 
+#geeks. One thing that people regularly do is quantify how much of a particular activity they do, 
+#but they rarely quantify how well they do it. In this project, your goal will be to use data from 
+#accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform
+#barbell lifts correctly and incorrectly in 5 different ways"
+
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+
+set.seed(123456)
+if (!file.exists("data")) { dir.create("data") }
+setwd("C:/Users/yhe/Desktop/data")
+
+#Downloading data
+trainUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(trainUrl, destfile = "./trainUrl")
+download.file(testUrl, destfile = "./testUrl")
+
+data_train <- read.csv(trainUrl, na.strings=c("NA","#DIV/0!",""))
+data_test <- read.csv(testUrl, na.strings=c("NA","#DIV/0!",""))
+
+#Partioning Training data set into two data sets, 70% for myTraining, 30% for myTesting:
+forTraining <- createDataPartition(y=data_train$classe, p=0.7, list=FALSE)
+myTraining <- data_train[forTraining, ]
+myTesting <- data_train[-forTraining, ]
+dim(myTraining)
+dim(myTesting)
+head(myTraining)
+head(myTesting)
+
+#Cleaning the data---Remove NearZeroVariance variables and NAs:
+nzv <- nearZeroVar(myTraining, saveMetrics=TRUE)
+myTraining <- myTraining[,nzv$nzv==FALSE]
+
+nzv<- nearZeroVar(myTesting,saveMetrics=TRUE)
+myTesting <- myTesting[,nzv$nzv==FALSE]
+
+myTraining <- myTraining[c(-1)]
+
+
+myTraining_final <- myTraining 
+for(i in 1:length(myTraining)){
+        if( sum( is.na( myTraining[, i] ) ) /nrow(myTraining) >= .7 ) {
+                for(j in 1:length(myTraining_final)) {
+                        if( length( grep(names(myTraining[i]), names(myTraining_final)[j]) ) ==1) {
+                                myTraining_final <- myTraining_final[ , -j]
+                        }
+                }
+        }
+}
+dim(myTraining_final)
+
+myTraining <- myTraining_final
+rm(myTraining_final)
+
+myTesting_final <- myTesting
+for(i in 1:length(myTesting)){
+        if( sum( is.na( myTesting[, i] ) ) /nrow(myTesting) >= .7 ) {
+                for(j in 1:length(myTesting_final)) {
+                        if( length( grep(names(myTesting[i]), names(myTesting_final)[j]) ) ==1) {
+                                myTesting_final <- myTesting_final[ , -j]
+                        }
+                }
+        }
+}
+dim(myTesting_final)
+
+myTesting <- myTesting_final
+rm(myTesting_final)
+
+#Train Candidate Model and Cross Validate---Random Forest model
+fitControl <- trainControl(method="cv", number=3, verboseIter=F)
+fit <- train(classe ~ ., data=myTraining, method="rf", trControl=fitControl)
+fit$finalModel
+
+# use model to predict classe in validation set (myTesting)
+preds <- predict(fit, newdata=myTesting)
+
+# show confusion matrix to get estimate of out-of-sample error
+confusionMatrix(myTesting$classe, preds)
+
+predTesting <- predict(fit, data_test)
+predTesting
+
+pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+                filename = paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+}
+
+pml_write_files(predTesting)
+
+#Conclusion---The model predicted the 20 test cases with 100% accuracy.
+
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
